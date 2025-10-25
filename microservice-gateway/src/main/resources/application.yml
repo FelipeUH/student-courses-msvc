@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: msvc-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: msvc-course
+              uri: lb://msvc-course
+              predicates:
+                - Path=/api/courses/**
+            - id: msvc-student
+              uri: lb://msvc-student
+              predicates:
+                - Path=/api/students/**
+  config:
+    import: optional:configserver:http://localhost:8888
+
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka

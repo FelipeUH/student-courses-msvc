@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PersistenceUnitSettings">
+    <persistence-units>
+      <persistence-unit moduleName="microservice-student" name="microservice-student" framework="JPA" ormUnit="microservice-student:microservice-student" defaultDataSourceId="b31f6b59-29ac-4be6-be88-113aa653cf72" />
+    </persistence-units>
+  </component>
+</project>
