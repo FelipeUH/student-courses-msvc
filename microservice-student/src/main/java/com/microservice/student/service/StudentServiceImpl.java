@@ -1,6 +1,7 @@
 package com.microservice.student.service;
 
 import com.microservice.student.entities.Student;
+import com.microservice.student.exception.ResourceNotFoundException;
 import com.microservice.student.persistence.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,8 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public Student findById(Long id) {
-        return studentRepository.findById(id).orElseThrow();
+        return studentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", id));
     }
 
     @Override
