@@ -4,6 +4,7 @@ import com.microservice.course.client.StudentClient;
 import com.microservice.course.dto.StudentByCourseResponse;
 import com.microservice.course.dto.StudentDTO;
 import com.microservice.course.entities.Course;
+import com.microservice.course.exception.ResourceNotFoundException;
 import com.microservice.course.persistence.CourseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,8 @@ public class CourseServiceImpl implements CourseService{
 
     @Override
     public Course findById(Long id) {
-        return courseRepository.findById(id).orElseThrow();
+        return courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", id));
     }
 
     @Override
@@ -34,7 +36,8 @@ public class CourseServiceImpl implements CourseService{
 
     @Override
     public StudentByCourseResponse findStudentsByCourseId(Long courseId) {
-        Course course = courseRepository.findById(courseId).orElseThrow();
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", courseId));
 
         List<StudentDTO> studentsList = studentClient.findAllStudentsByCourse(courseId);
 
