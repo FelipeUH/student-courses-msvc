@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: msvc-course
+              uri: lb://msvc-course
+              predicates:
+                - Path=/api/courses/**
+            - id: msvc-student
+              uri: lb://msvc-student
+              predicates:
+                - Path=/api/students/**
