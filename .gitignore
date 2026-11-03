@@ -1,0 +1,22 @@
+# Build
+target/
+HELP.md
+.mvn/wrapper/maven-wrapper.jar
+
+# IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+
+# Variables de entorno locales
+.env
+*.env
+
+# SO
+.DS_Store
