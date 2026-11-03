@@ -64,7 +64,7 @@ sequenceDiagram
 - Java 21
 - Spring Boot 3.5.7, Spring Web, Spring Data JPA / Hibernate
 - Spring Cloud: Gateway, Netflix Eureka, OpenFeign, Config
-- PostgreSQL
+- PostgreSQL + Flyway (migraciones)
 - Lombok
 - Maven (proyecto multimódulo)
 
@@ -79,6 +79,8 @@ persistence/  → repositorios Spring Data JPA
 entities/     → entidades JPA
 dto/          → objetos de transferencia (solo en msvc-course)
 client/       → cliente Feign hacia msvc-student (solo en msvc-course)
+
+resources/db/migration/  → migraciones Flyway (esquema y datos de ejemplo)
 ```
 
 ## Endpoints (a través del gateway, puerto 8080)
@@ -116,30 +118,23 @@ Ejemplo de respuesta de `GET /api/courses/1/students`:
 
 ### 1. Base de datos
 
-Crea las dos bases de datos y sus tablas en PostgreSQL. Los servicios usan `ddl-auto: validate`, así que las tablas deben existir antes de arrancar:
+Crea las dos bases de datos vacías en PostgreSQL:
 
 ```sql
 CREATE DATABASE course_db;
 CREATE DATABASE student_db;
-
--- En course_db
-CREATE TABLE courses (
-    id      BIGSERIAL PRIMARY KEY,
-    name    VARCHAR(255),
-    teacher VARCHAR(255)
-);
-
--- En student_db
-CREATE TABLE students (
-    id        BIGSERIAL PRIMARY KEY,
-    name      VARCHAR(255),
-    last_name VARCHAR(255),
-    email     VARCHAR(255),
-    course_id BIGINT
-);
 ```
 
-Los datos de ejemplo están en `src/main/resources/poblate.sql` de cada servicio.
+Al arrancar, cada servicio aplica con **Flyway** las migraciones de `src/main/resources/db/migration/`:
+
+| Migración | Qué hace |
+|---|---|
+| `V1__create_<tabla>_table.sql` | Crea la tabla |
+| `V2__insert_sample_<tabla>.sql` | Carga los datos de ejemplo |
+
+Flyway registra las migraciones aplicadas en la tabla `flyway_schema_history`, así que cada una se ejecuta una sola vez. Para cambiar el esquema, añade una migración nueva (`V3__...sql`). No modifiques las que ya se aplicaron.
+
+> Si creaste las tablas a mano con una versión anterior de este README, Flyway no arrancará sobre ese esquema. Borra y vuelve a crear las bases de datos (`DROP DATABASE course_db;` y `DROP DATABASE student_db;`).
 
 ### 2. Configuración
 
