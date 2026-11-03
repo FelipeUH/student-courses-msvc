@@ -114,6 +114,27 @@ Ejemplo de respuesta de `GET /api/courses/1/students`:
 }
 ```
 
+### Errores
+
+Los errores se devuelven con el formato estándar `ProblemDetail` (RFC 9457, `Content-Type: application/problem+json`):
+
+| Código | Cuándo |
+|---|---|
+| 404 Not Found | El estudiante o curso con ese ID no existe (`/api/students/{id}`, `/api/courses/{id}`, `/api/courses/{courseId}/students`) |
+| 503 Service Unavailable | `/api/courses/{courseId}/students` no puede contactar con `msvc-student` (caído o no registrado en Eureka) |
+
+Ejemplo de `GET /api/courses/999`:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "Course with id 999 not found",
+  "instance": "/api/courses/999"
+}
+```
+
 ## Cómo ejecutarlo
 
 ### 1. Base de datos
@@ -181,5 +202,4 @@ Cuando todo esté arriba, el panel de Eureka en http://localhost:8761 debe mostr
 ## Próximos pasos
 
 - Agregar pruebas unitarias con JUnit 5 y Mockito para la capa de servicio.
-- Manejo de errores con `@ControllerAdvice` (hoy un ID inexistente responde 500).
 - Dockerizar los servicios con `docker-compose`.
