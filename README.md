@@ -137,7 +137,44 @@ Ejemplo de `GET /api/courses/999`:
 
 ## Cómo ejecutarlo
 
-### 1. Base de datos
+### Con Docker (recomendado)
+
+Requisitos: Docker con Compose v2 (`docker compose`). No hace falta tener Java, Maven ni PostgreSQL instalados.
+
+```bash
+docker compose up --build
+```
+
+Esto compila los cinco servicios dentro de contenedores (un único `Dockerfile` parametrizado con el build arg `MODULE`) y levanta:
+
+| Servicio | Expuesto en el host |
+|---|---|
+| `postgres` (crea `student_db` y `course_db`; Flyway carga los datos) | — |
+| `msvc-config` | — |
+| `msvc-eureka` | http://localhost:8761 (panel) |
+| `msvc-student`, `msvc-course` | — |
+| `msvc-gateway` | http://localhost:8080 |
+
+El orden de arranque (config → eureka → student/course → gateway) se garantiza con healthchecks sobre `/actuator/health` y `depends_on: condition: service_healthy`. Para comprobarlo:
+
+```bash
+docker compose ps                                   # todos deben aparecer "healthy"
+curl http://localhost:8080/api/courses/1/students
+```
+
+> Recién arrancado, el gateway puede responder `503` durante unos 20–30 s, hasta que descarga de Eureka el registro de servicios. Vuelve a intentarlo pasado ese tiempo.
+
+**Credenciales.** Por defecto se usan `postgres` / `root`. Para cambiarlas, copia `.env.example` a `.env` (ignorado por Git) y edita los valores; Compose lo lee automáticamente.
+
+**Datos.** PostgreSQL guarda los datos en el volumen `postgres-data`. El script `docker/postgres/init-databases.sql` solo se ejecuta cuando el volumen está vacío, así que para empezar de cero (o tras cambiar las credenciales):
+
+```bash
+docker compose down -v   # detiene todo y borra el volumen
+```
+
+### Manual (sin Docker)
+
+#### 1. Base de datos
 
 Crea las dos bases de datos vacías en PostgreSQL:
 
@@ -157,7 +194,7 @@ Flyway registra las migraciones aplicadas en la tabla `flyway_schema_history`, a
 
 > Si creaste las tablas a mano con una versión anterior de este README, Flyway no arrancará sobre ese esquema. Borra y vuelve a crear las bases de datos (`DROP DATABASE course_db;` y `DROP DATABASE student_db;`).
 
-### 2. Configuración
+#### 2. Configuración
 
 Toda la configuración está centralizada en el Config Server, en `microservice-config/src/main/resources/configurations/`:
 
@@ -178,6 +215,7 @@ Los valores sensibles o que dependen del entorno se leen de variables de entorno
 | `DB_PASSWORD` | `root` | student, course |
 | `EUREKA_URL` | `http://localhost:8761/eureka` | todos los clientes de Eureka |
 | `CONFIG_SERVER_URL` | `http://localhost:8888` | todos los servicios |
+| `EUREKA_INSTANCE_HOSTNAME` | `localhost` | nombre con el que cada servicio se registra en Eureka (en Docker, el nombre del contenedor) |
 
 El Config Server devuelve los `${...}` sin resolver, y cada servicio los sustituye con sus propias variables de entorno. Así, las contraseñas reales nunca se guardan en el Config Server ni en el repositorio:
 
@@ -185,7 +223,7 @@ El Config Server devuelve los `${...}` sin resolver, y cada servicio los sustitu
 DB_PASSWORD=mi-clave ./mvnw spring-boot:run
 ```
 
-### 3. Arrancar los servicios (en este orden)
+#### 3. Arrancar los servicios (en este orden)
 
 ```bash
 cd microservice-config  && ./mvnw spring-boot:run   # 1. Configuración centralizada
@@ -202,4 +240,3 @@ Cuando todo esté arriba, el panel de Eureka en http://localhost:8761 debe mostr
 ## Próximos pasos
 
 - Agregar pruebas unitarias con JUnit 5 y Mockito para la capa de servicio.
-- Dockerizar los servicios con `docker-compose`.
