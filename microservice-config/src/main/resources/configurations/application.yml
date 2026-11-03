@@ -2,7 +2,8 @@
 # Los valores ${VAR:defecto} se resuelven en cada servicio, a partir de sus variables de entorno.
 eureka:
   instance:
-    hostname: localhost
+    # En Docker, cada servicio define su nombre en la red de compose
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
   client:
     service-url:
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
