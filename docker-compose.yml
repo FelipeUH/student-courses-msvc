@@ -1,0 +1,124 @@
+# Levanta el sistema completo: docker compose up --build
+# Las credenciales se pueden sobrescribir con un archivo .env (ver .env.example).
+
+x-healthcheck: &healthcheck
+  interval: 10s
+  timeout: 5s
+  retries: 10
+  start_period: 30s
+
+x-db-env: &db-env
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_USERNAME: ${POSTGRES_USER:-postgres}
+  DB_PASSWORD: ${POSTGRES_PASSWORD:-root}
+
+x-cloud-env: &cloud-env
+  CONFIG_SERVER_URL: http://msvc-config:8888
+  EUREKA_URL: http://msvc-eureka:8761/eureka
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # "z" etiqueta el archivo para SELinux (Fedora, RHEL); en otros sistemas no tiene efecto
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro,z
+    healthcheck:
+      <<: *healthcheck
+      # Por TCP: durante la inicialización PostgreSQL solo escucha por socket
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER}"]
+      start_period: 10s
+
+  msvc-config:
+    build:
+      context: .
+      args:
+        MODULE: microservice-config
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "curl", "-fs", "http://localhost:8888/actuator/health"]
+
+  msvc-eureka:
+    build:
+      context: .
+      args:
+        MODULE: microservice-eureka
+    environment:
+      <<: *cloud-env
+      EUREKA_INSTANCE_HOSTNAME: msvc-eureka
+    ports:
+      - "8761:8761"
+    depends_on:
+      msvc-config:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "curl", "-fs", "http://localhost:8761/actuator/health"]
+
+  msvc-student:
+    build:
+      context: .
+      args:
+        MODULE: microservice-student
+    environment:
+      <<: [*cloud-env, *db-env]
+      EUREKA_INSTANCE_HOSTNAME: msvc-student
+    depends_on:
+      postgres:
+        condition: service_healthy
+      msvc-config:
+        condition: service_healthy
+      msvc-eureka:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "curl", "-fs", "http://localhost:8090/actuator/health"]
+
+  msvc-course:
+    build:
+      context: .
+      args:
+        MODULE: microservice-course
+    environment:
+      <<: [*cloud-env, *db-env]
+      EUREKA_INSTANCE_HOSTNAME: msvc-course
+    depends_on:
+      postgres:
+        condition: service_healthy
+      msvc-config:
+        condition: service_healthy
+      msvc-eureka:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "curl", "-fs", "http://localhost:8091/actuator/health"]
+
+  msvc-gateway:
+    build:
+      context: .
+      args:
+        MODULE: microservice-gateway
+    environment:
+      <<: *cloud-env
+      EUREKA_INSTANCE_HOSTNAME: msvc-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      msvc-config:
+        condition: service_healthy
+      msvc-eureka:
+        condition: service_healthy
+      msvc-student:
+        condition: service_healthy
+      msvc-course:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]
+
+volumes:
+  postgres-data:
