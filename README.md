@@ -4,22 +4,48 @@ Proyecto de práctica de una arquitectura de microservicios con **Spring Boot 3.
 
 ## Arquitectura
 
-```
-                    ┌──────────────────────┐
-  Cliente  ───────► │  msvc-gateway :8080  │
-                    └──────────┬───────────┘
-                               │  lb://  (balanceo vía Eureka)
-              ┌────────────────┴────────────────┐
-              ▼                                 ▼
-   ┌─────────────────────┐   OpenFeign   ┌─────────────────────┐
-   │ msvc-course  :8091  │ ────────────► │ msvc-student :8090  │
-   └─────────┬───────────┘               └─────────┬───────────┘
-             ▼                                     ▼
-       PostgreSQL                             PostgreSQL
-       course_db                              student_db
+```mermaid
+flowchart LR
+    C([Cliente]) --> GW["msvc-gateway<br/>:8080"]
+    GW -->|"/api/courses/**<br/>lb://msvc-course"| CS["msvc-course<br/>:8091"]
+    GW -->|"/api/students/**<br/>lb://msvc-student"| SS["msvc-student<br/>:8090"]
+    CS -->|OpenFeign| SS
+    CS --> CDB[("PostgreSQL<br/>course_db")]
+    SS --> SDB[("PostgreSQL<br/>student_db")]
 
-   msvc-eureka :8761  ← registro de servicios
-   microservice-config :8888  ← configuración centralizada (en construcción)
+    EU["msvc-eureka<br/>:8761"]
+    GW -.->|resuelve servicios| EU
+    CS -.->|se registra| EU
+    SS -.->|se registra| EU
+
+    CFG["microservice-config :8888<br/>(en construcción)"]
+    style CFG stroke-dasharray: 5 5
+```
+
+Cada servicio tiene su propia base de datos y se registra en Eureka. El Gateway y el cliente Feign localizan los servicios por nombre (`lb://`), no por dirección fija.
+
+### Ejemplo: estudiantes de un curso
+
+`GET /api/courses/{courseId}/students` combina datos de los dos servicios:
+
+```mermaid
+sequenceDiagram
+    actor C as Cliente
+    participant GW as msvc-gateway
+    participant EU as msvc-eureka
+    participant CS as msvc-course
+    participant SS as msvc-student
+
+    C->>GW: GET /api/courses/1/students
+    GW->>EU: ¿Dónde está msvc-course?
+    GW->>CS: GET /api/courses/1/students
+    CS->>CS: Busca el curso en course_db
+    CS->>EU: ¿Dónde está msvc-student?
+    CS->>SS: GET /api/students/course/1 (Feign)
+    SS->>SS: Busca estudiantes en student_db
+    SS-->>CS: Lista de estudiantes
+    CS-->>GW: Curso + estudiantes
+    GW-->>C: 200 OK
 ```
 
 | Módulo | Puerto | Responsabilidad |
