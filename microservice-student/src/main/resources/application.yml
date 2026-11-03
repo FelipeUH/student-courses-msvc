@@ -3,4 +3,4 @@ spring:
     name: msvc-student
   config:
     # El resto de la configuración vive en microservice-config (configurations/msvc-student.yml)
-    import: configserver:http://localhost:8888
+    import: configserver:${CONFIG_SERVER_URL:http://localhost:8888}
