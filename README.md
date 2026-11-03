@@ -18,8 +18,11 @@ flowchart LR
     CS -.->|se registra| EU
     SS -.->|se registra| EU
 
-    CFG["microservice-config :8888<br/>(en construcción)"]
-    style CFG stroke-dasharray: 5 5
+    CFG["msvc-config<br/>:8888"]
+    GW -.->|obtiene config| CFG
+    CS -.->|obtiene config| CFG
+    SS -.->|obtiene config| CFG
+    EU -.->|obtiene config| CFG
 ```
 
 Cada servicio tiene su propia base de datos y se registra en Eureka. El Gateway y el cliente Feign localizan los servicios por nombre (`lb://`), no por dirección fija.
@@ -54,7 +57,7 @@ sequenceDiagram
 | `microservice-eureka` | 8761 | Servidor de descubrimiento (Netflix Eureka). |
 | `microservice-student` | 8090 | CRUD de estudiantes y consulta por curso. |
 | `microservice-course` | 8091 | CRUD de cursos. Agrega los estudiantes de un curso llamando a `msvc-student` con un cliente Feign. |
-| `microservice-config` | 8888 | Esqueleto de Spring Cloud Config Server (aún sin configurar). |
+| `microservice-config` | 8888 | Spring Cloud Config Server (perfil `native`). Sirve la configuración de todos los servicios desde `src/main/resources/configurations/`. |
 
 ## Tecnologías
 
@@ -138,22 +141,50 @@ CREATE TABLE students (
 
 Los datos de ejemplo están en `src/main/resources/poblate.sql` de cada servicio.
 
-Las credenciales por defecto (`postgres` / `root` en `localhost:5432`) se configuran en el `application.yml` de cada servicio.
+### 2. Configuración
 
-### 2. Arrancar los servicios (en este orden)
+Toda la configuración está centralizada en el Config Server, en `microservice-config/src/main/resources/configurations/`:
+
+| Archivo | Lo usa |
+|---|---|
+| `application.yml` | Todos los servicios (URL de Eureka) |
+| `msvc-<servicio>.yml` | Solo ese servicio (puerto, base de datos, rutas del gateway…) |
+
+El `application.yml` de cada servicio solo contiene su nombre y el `import` obligatorio del Config Server. Si el Config Server no está arriba, el servicio no arranca.
+
+Los valores sensibles o que dependen del entorno se leen de variables de entorno. Si una variable no está definida, se usa el valor por defecto, pensado para desarrollo local:
+
+| Variable | Por defecto | Usada por |
+|---|---|---|
+| `DB_HOST` | `localhost` | student, course |
+| `DB_PORT` | `5432` | student, course |
+| `DB_USERNAME` | `postgres` | student, course |
+| `DB_PASSWORD` | `root` | student, course |
+| `EUREKA_URL` | `http://localhost:8761/eureka` | todos los clientes de Eureka |
+| `CONFIG_SERVER_URL` | `http://localhost:8888` | todos los servicios |
+
+El Config Server devuelve los `${...}` sin resolver, y cada servicio los sustituye con sus propias variables de entorno. Así, las contraseñas reales nunca se guardan en el Config Server ni en el repositorio:
 
 ```bash
-cd microservice-eureka  && ./mvnw spring-boot:run   # 1. Registro de servicios
-cd microservice-student && ./mvnw spring-boot:run   # 2.
-cd microservice-course  && ./mvnw spring-boot:run   # 3.
-cd microservice-gateway && ./mvnw spring-boot:run   # 4. Punto de entrada
+DB_PASSWORD=mi-clave ./mvnw spring-boot:run
 ```
+
+### 3. Arrancar los servicios (en este orden)
+
+```bash
+cd microservice-config  && ./mvnw spring-boot:run   # 1. Configuración centralizada
+cd microservice-eureka  && ./mvnw spring-boot:run   # 2. Registro de servicios
+cd microservice-student && ./mvnw spring-boot:run   # 3.
+cd microservice-course  && ./mvnw spring-boot:run   # 4.
+cd microservice-gateway && ./mvnw spring-boot:run   # 5. Punto de entrada
+```
+
+Para ver la configuración que recibe un servicio: `curl http://localhost:8888/msvc-course/default`.
 
 Cuando todo esté arriba, el panel de Eureka en http://localhost:8761 debe mostrar `MSVC-STUDENT`, `MSVC-COURSE` y `MSVC-GATEWAY` registrados.
 
 ## Próximos pasos
 
-- Completar el Config Server (`@EnableConfigServer` y repositorio de configuración).
 - Agregar pruebas unitarias con JUnit 5 y Mockito para la capa de servicio.
 - Manejo de errores con `@ControllerAdvice` (hoy un ID inexistente responde 500).
 - Dockerizar los servicios con `docker-compose`.
